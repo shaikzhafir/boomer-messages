@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boomer Image Maker</title>
+    <script  src="index.js"></script>
+    <script src="https://unpkg.com/konva@7.0.3/konva.min.js"></script>
+    <script type="module" src="quotes.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body onload="draw()" class="container">
+    <canvas class="element" id="tutorial" width="500" height="500"></canvas>
+    <div class="break"></div>
+    <br>
+    
+    <input type="radio" value="morning" name="time">
+    <label for="morning">Good Morning</label>
+    <input type="radio" value="afternoon" name="time">
+    <label for="afternoon">Good Afternoon</label>
+    <input type="radio" value="evening" name="time">
+    <label for="evening">Good Evening</label>
+    <div class="break"></div><br>
+    
+    <div>
+        <button class="element" onclick="draw()">Click me to generate</button>
+    </div>
+        
+</body>
+</html>
