@@ -132,6 +132,31 @@ let count = 0;
   }
 
 
+  function addImage() { 
+    console.log('iamge works');
+    var imageObj = new Image();
+    imageObj.onload = function () {
+      var img = new Konva.Image({
+        x: 50,
+        y: 50,
+        zIndex : 2,
+        image: imageObj,
+        width: 500,
+        height: 500,
+        name : 'image'
+      });
+
+      // add the shape to the layer
+      layer.add(img);
+      layer.batchDraw();
+    };
+    imageObj.src = randomImages[Math.floor(Math.random()*5)]
+
+
+   
+  }
+
+
   function checkBounds(pos,start,end) {
       if (pos < start){
           return start
@@ -143,3 +168,13 @@ let count = 0;
           return pos
       }
   }
+
+
+  let randomImages = [
+    'https://cdnb.artstation.com/p/assets/images/images/006/710/803/large/nirmala-handapangoda-nyh-wallpaper.jpg?1500658706',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Random_scenery_%28553758001%29.jpg/1200px-Random_scenery_%28553758001%29.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/0/0e/Terragen_render.jpg',
+    'https://i.pinimg.com/originals/c7/82/17/c78217c3fcbe7c20e6dd3194be5aa7f9.jpg',
+    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQVv3FGfF1kcXjQOKt-LBmt9uDQD2XVJMkH7A&usqp=CAU'
+
+]
