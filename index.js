@@ -1,50 +1,102 @@
-
-//key value pair for randomImages to get a suitable colour for text?
-
-let randomImages = [
-    'https://cdnb.artstation.com/p/assets/images/images/006/710/803/large/nirmala-handapangoda-nyh-wallpaper.jpg?1500658706',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Random_scenery_%28553758001%29.jpg/1200px-Random_scenery_%28553758001%29.jpg',
-    'https://upload.wikimedia.org/wikipedia/commons/0/0e/Terragen_render.jpg',
-    'https://i.pinimg.com/originals/c7/82/17/c78217c3fcbe7c20e6dd3194be5aa7f9.jpg',
-    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQVv3FGfF1kcXjQOKt-LBmt9uDQD2XVJMkH7A&usqp=CAU'
-
-]
+// first we need to create a stage
+let textboxContainer = document.getElementById('textboxContainer')
+var stage = new Konva.Stage({
+    container: 'container',   // id of container <div>
+    width: 500,
+    height: 500
+  });
 
 
-let randomTexts = [
-    'today we wake up\nwe thank god we are alive\nthank you god',
-    'Don\'t eat maggi mee\nlater will go bald\nlike your father',
-    'Have a good day\nlook at the sun',
-]
-
-
-function draw(e) {
   
-  var canvas = document.getElementById("tutorial");
-  if (canvas.getContext) {
-    var ctx = canvas.getContext("2d");
-    let randomImage = randomImages[Math.floor(Math.random()*5)]
-    let randomText = randomTexts[Math.floor(Math.random()*3)]
-    let lines = randomText.split('\n')
-    let space = 60
+  // then create layer
+  var layer = new Konva.Layer();
+  
+  function addText() {
+
     
-    ctx.font = "50px serif";
-    var img = new Image();
-    img.onload = function () {
-      ctx.drawImage(img, 0, 0,500,500);
-      ctx.fillStyle = "white"
-      ctx.fillText("Good Morning", 50, 200);
-      
-      ctx.font = "40px serif";
-      lines.forEach((line,index) => {
-        ctx.fillStyle = "white"
-        ctx.fillText(line, 50,300 + index*space,500)    
+
+    var simpleText = new Konva.Text({
+        x: 0,
+        y: 0,
+        text: 'Simple Text',
+        fontSize: 30,
+        fontFamily: 'Calibri',
+        fill: 'green',
+        draggable: true,
+        dragBoundFunc: function (pos) {
+          var newX = checkBounds(pos.x,0,400)
+          var newY = checkBounds(pos.y,0,400);
+          return {
+            x: newX,
+            y: newY,
+          };
+        },
       });
+
+      layer.add(simpleText)
+
+      var textGroup = new Konva.Transformer({
+        node: simpleText,
+        enabledAnchors: ['middle-left', 'middle-right'],
+        // set minimum width of text
+        boundBoxFunc: function (oldBox, newBox) {
+          newBox.width = Math.max(30, newBox.width);
+          return newBox;
+        },
+        
+      });
+
+      simpleText.on('transform', function () {
+        // reset scale, so only with is changing by transformer
+        simpleText.setAttrs({
+          width: simpleText.width() * simpleText.scaleX(),
+          scaleX: 1,
+        });
+      });
+    
+      layer.add(textGroup);
+
+      layer.draw()
+      // to align text in the middle of the screen, we can set the
+      // shape offset to the center of the text shape after instantiating it
+      //impleText.offsetX(simpleText.width() / 2);
+    
+      // since this text is inside of a defined area, we can center it using
+      // align: 'center'
       
-    };
-    img.src = randomImage
+
+
+
+      //add textbox to html 
+      let textbox = document.createElement('input')
+      textbox.type = "text"
+      textboxContainer.appendChild(textbox)
+      const lineBreak = document.createElement('br');
+      textboxContainer.appendChild(lineBreak)
+      textbox.oninput = function (e) {
+        simpleText.text(e.target.value)
+        layer.draw()
+      }
+
+      // add the layer to the stage
+      stage.add(layer);
+    
+    
+    
+    
+      
     
   }
-}
 
 
+  function checkBounds(pos,start,end) {
+      if (pos < start){
+          return start
+      }
+      else if (pos > end){
+          return end
+      }
+      else {
+          return pos
+      }
+  }
