@@ -6,22 +6,24 @@ var stage = new Konva.Stage({
     height: 500
   });
 
+let count = 0;
+
 
   
   // then create layer
   var layer = new Konva.Layer();
   
   function addText() {
-
-    
-
+    count++;
     var simpleText = new Konva.Text({
         x: 0,
         y: 0,
         text: 'Simple Text',
         fontSize: 30,
+        fontStyle : 'bold',
         fontFamily: 'Calibri',
-        fill: 'green',
+        fill: 'black',
+        name : 'text',
         draggable: true,
         dragBoundFunc: function (pos) {
           var newX = checkBounds(pos.x,0,400)
@@ -36,8 +38,8 @@ var stage = new Konva.Stage({
       layer.add(simpleText)
 
       var textGroup = new Konva.Transformer({
-        node: simpleText,
-        enabledAnchors: ['middle-left', 'middle-right'],
+        //the draggy things
+        enabledAnchors: ['top-left', 'top-right', 'bottom-right','bottom-left'],
         // set minimum width of text
         boundBoxFunc: function (oldBox, newBox) {
           newBox.width = Math.max(30, newBox.width);
@@ -46,40 +48,81 @@ var stage = new Konva.Stage({
         
       });
 
-      simpleText.on('transform', function () {
-        // reset scale, so only with is changing by transformer
-        simpleText.setAttrs({
-          width: simpleText.width() * simpleText.scaleX(),
-          scaleX: 1,
-        });
-      });
-    
+      textGroup.nodes([simpleText])
       layer.add(textGroup);
-
       layer.draw()
-      // to align text in the middle of the screen, we can set the
-      // shape offset to the center of the text shape after instantiating it
-      //impleText.offsetX(simpleText.width() / 2);
-    
-      // since this text is inside of a defined area, we can center it using
-      // align: 'center'
-      
+  
 
 
 
-      //add textbox to html 
+      //add textbox to html and text 1 or 2
+      let label = document.createElement('span')
+      label.textContent = "text" + count + " "
+      textboxContainer.appendChild(label)
       let textbox = document.createElement('input')
       textbox.type = "text"
       textboxContainer.appendChild(textbox)
-      const lineBreak = document.createElement('br');
-      textboxContainer.appendChild(lineBreak)
       textbox.oninput = function (e) {
         simpleText.text(e.target.value)
         layer.draw()
       }
 
+      //add delete function
+      let deleteButton = document.createElement('button')
+      deleteButton.textContent = 'X'
+      deleteButton.onclick = function deleteText(e) {
+          simpleText.destroy()
+          textGroup.destroy()
+          layer.draw()
+          label.remove()
+          textbox.remove()
+          deleteButton.remove()
+          lineBreak.remove()
+      }
+      textboxContainer.appendChild(deleteButton)
+      const lineBreak = document.createElement('br');
+      textboxContainer.appendChild(lineBreak)
       // add the layer to the stage
       stage.add(layer);
+
+      
+
+      stage.on('click tap', function (e) {
+      
+        // if click on empty area - remove all selections
+        if (e.target === stage) {
+          textGroup.nodes([]);
+          layer.draw();
+          return;
+        }
+
+        // do nothing if clicked NOT on our text
+        if (!e.target.hasName('text')) {
+          return;
+        }
+
+
+        const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+        const isSelected = textGroup.nodes().indexOf(e.target) >= 0;
+
+        if (!metaPressed && !isSelected) {
+          // if no key pressed and the node is not selected
+          // select just one
+          textGroup.nodes([e.target]);
+        } else if (metaPressed && isSelected) {
+          // if we pressed keys and node was selected
+          // we need to remove it from selection:
+          const nodes = textGroup.nodes().slice(); // use slice to have new copy of array
+          // remove node from array
+          nodes.splice(nodes.indexOf(e.target), 1);
+          textGroup.nodes(nodes);
+        } else if (metaPressed && !isSelected) {
+          // add the node into selection
+          const nodes = textGroup.nodes().concat([e.target]);
+          textGroup.nodes(nodes);
+        }
+    });
+    
     
     
     
