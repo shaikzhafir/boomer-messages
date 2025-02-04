@@ -1,35 +1,498 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boomer Image Maker</title>
-    
-    <script type="module" src="quotes.js"></script>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div id="container"></div>
-    <button onclick="addText()">Add text</button><br>
-    <button onclick="addImage()">Add image</button>
-    <div id="textboxContainer">
+    <title>Drawing Canvas</title>
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
+        .toolbar {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .button {
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background: #f0f0f0;
+        }
+
+        #canvas {
+            border: 1px solid #ccc;
+            background: white;
+        }
+
+        .text-controls {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        .text-controls.active {
+            display: block;
+        }
+
+        .text-editor {
+            position: absolute;
+            display: none;
+            min-width: 50px;
+            padding: 5px;
+            background: white;
+            border: 1px solid #ccc;
+            font-family: Arial;
+            outline: none;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <button class="button" id="addTextBtn">Add Text</button>
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            <button class="button" id="addImageBtn">Upload Image</button>
+            <button class="button" id="clearBtn">Clear Canvas</button>
+            <button class="button" id="downloadBtn">Download</button>
+        </div>
+
+        <div class="text-controls" id="textControls">
+            <input type="text" id="textInput" placeholder="Enter text">
+            <input type="color" id="colorPicker" value="#000000">
+            <input type="number" id="fontSize" value="20" min="8" max="72">
+            <button class="button" id="confirmText">Add</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
     </div>
-    
-    <input type="radio" value="morning" name="time">
-    <label for="morning">Good Morning</label>
-    <input type="radio" value="afternoon" name="time">
-    <label for="afternoon">Good Afternoon</label>
-    <input type="radio" value="evening" name="time">
-    <label for="evening">Good Evening</label>
-    <div class="break"></div><br>
-    
-    <div>
-        <button class="element" onclick="draw()">Click me to generate</button>
-    </div>
-        
+    <div id="textEditor" class="text-editor" contenteditable="true"></div>
+
+    <script>
+        class DrawingCanvas {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.elements = [];
+                this.isDragging = false;
+                this.isResizing = false;
+                this.selectedElement = null;
+                this.selectedHandle = null;
+                this.dragStartX = 0;
+                this.dragStartY = 0;
+                this.handleSize = 8;
+
+                // text editor code
+                this.textEditor = document.getElementById('textEditor');
+                this.isEditing = false;
+
+                // Add these to the existing constructor
+                this.setupTextEditor();
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+                this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+                this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+                this.canvas.addEventListener('dblclick', this.handleDoubleClick.bind(this));
+
+                // Paste event for images
+                document.addEventListener('paste', this.handlePaste.bind(this));
+
+
+                document.getElementById('addTextBtn').addEventListener('click', () => {
+                    document.getElementById('textControls').classList.toggle('active');
+                });
+
+                document.getElementById('confirmText').addEventListener('click', () => {
+                    const text = document.getElementById('textInput').value;
+                    const color = document.getElementById('colorPicker').value;
+                    const fontSize = document.getElementById('fontSize').value;
+                    this.addText(text, 50, 50, color, fontSize);
+                    document.getElementById('textControls').classList.remove('active');
+                    document.getElementById('textInput').value = '';
+                });
+
+                document.getElementById('addImageBtn').addEventListener('click', () => {
+                    document.getElementById('imageInput').click();
+                });
+
+                document.getElementById('imageInput').addEventListener('change', (e) => {
+                    this.handleImageUpload(e.target.files[0]);
+                });
+
+                document.getElementById('clearBtn').addEventListener('click', () => {
+                    this.clear();
+                });
+
+                document.getElementById('downloadBtn').addEventListener('click', () => {
+                    this.download();
+                });
+
+            }
+
+            setupTextEditor() {
+                this.textEditor.addEventListener('blur', () => {
+                    this.finalizeTextEdit();
+                });
+
+                this.textEditor.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        console.log('Enter key pressed');
+                        e.preventDefault();
+                        this.finalizeTextEdit();
+                    }
+                });
+
+                // Handle text editor input
+                this.textEditor.addEventListener('input', () => {
+                    // Automatically adjust width to content
+                    this.textEditor.style.width = 'auto';
+                    this.textEditor.style.width = `${this.textEditor.scrollWidth}px`;
+                });
+            }
+
+            handleDoubleClick(e) {
+                if (!this.selectedElement || this.selectedElement.type !== 'text') return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (this.isPointInElement(x, y, this.selectedElement)) {
+                    this.startTextEdit(this.selectedElement);
+                }
+            }
+
+            startTextEdit(element) {
+                this.isEditing = true;
+                const canvasRect = this.canvas.getBoundingClientRect();
+
+                // Position and style the text editor
+                this.textEditor.style.display = 'block';
+                this.textEditor.style.left = `${canvasRect.left + element.x}px`;
+                this.textEditor.style.top = `${canvasRect.top + element.y - element.height}px`;
+                this.textEditor.style.fontSize = `${element.fontSize}px`;
+                this.textEditor.style.color = element.color;
+                this.textEditor.textContent = element.text;
+
+                // Focus and select all text
+                this.textEditor.focus();
+                document.execCommand('selectAll', false, null);
+            }
+
+            finalizeTextEdit() {
+                if (!this.isEditing) return;
+
+                const newText = this.textEditor.textContent;
+                if (this.selectedElement && newText.trim() !== '') {
+                    this.selectedElement.text = newText;
+
+                    // Update text measurements
+                    this.ctx.font = `${this.selectedElement.fontSize}px Arial`;
+                    this.selectedElement.width = this.ctx.measureText(newText).width;
+                }
+
+                if (newText.trim() === '' && this.selectedElement) {
+                    // Remove empty text elements
+                    const index = this.elements.indexOf(this.selectedElement);
+                    this.elements.splice(index, 1);
+                    this.selectedElement = null;
+                }
+
+                // Hide the text editor
+                this.textEditor.style.display = 'none';
+                this.textEditor.textContent = '';
+                this.isEditing = false;
+                this.render();
+            }
+
+
+            addText(text, x, y, color = '#000000', fontSize = 20) {
+                this.ctx.font = `${fontSize}px Arial`;
+                const metrics = this.ctx.measureText(text);
+                const width = metrics.width;
+                const height = parseInt(fontSize);
+
+                const newElement = {
+                    type: 'text',
+                    text,
+                    x,
+                    y,
+                    color,
+                    fontSize,
+                    width,
+                    height,
+                    scale: 1
+                };
+                this.elements.push(newElement);
+                this.selectedElement = newElement;
+                this.render();
+            }
+
+
+            addImage(image, x, y) {
+                // Get canvas dimensions
+                const canvasWidth = this.canvas.width;
+                const canvasHeight = this.canvas.height;
+
+                // Calculate scale to fill entire canvas
+                const scale = Math.max(canvasWidth / image.width, canvasHeight / image.height);
+
+                // Calculate centered position
+                const scaledWidth = image.width * scale;
+                const scaledHeight = image.height * scale;
+                const centerX = (canvasWidth - scaledWidth) / 2;
+                const centerY = (canvasHeight - scaledHeight) / 2;
+
+                this.elements.push({
+                    type: 'image',
+                    image,
+                    x: centerX,
+                    y: centerY,
+                    width: scaledWidth,
+                    height: scaledHeight
+                });
+                this.render();
+            }
+
+            handleImageUpload(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.addImage(img, 700, 500);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            handlePaste(e) {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        const blob = items[i].getAsFile();
+                        this.handleImageUpload(blob);
+                    }
+                }
+            }
+
+
+            drawResizeHandles(element) {
+                const handles = this.getResizeHandles(element);
+                this.ctx.fillStyle = '#000';
+
+                handles.forEach(handle => {
+                    this.ctx.fillRect(
+                        handle.x - this.handleSize / 2,
+                        handle.y - this.handleSize / 2,
+                        this.handleSize,
+                        this.handleSize
+                    );
+                });
+            }
+
+            getResizeHandles(element) {
+                return [
+                    { x: element.x, y: element.y, cursor: 'nw-resize', position: 'nw' },
+                    { x: element.x + element.width, y: element.y, cursor: 'ne-resize', position: 'ne' },
+                    { x: element.x, y: element.y + element.height, cursor: 'sw-resize', position: 'sw' },
+                    { x: element.x + element.width, y: element.y + element.height, cursor: 'se-resize', position: 'se' }
+                ];
+            }
+
+            isOverResizeHandle(x, y, element) {
+                const handles = this.getResizeHandles(element);
+                for (const handle of handles) {
+                    if (Math.abs(x - handle.x) <= this.handleSize / 2 &&
+                        Math.abs(y - handle.y) <= this.handleSize / 2) {
+                        return handle;
+                    }
+                }
+                return null;
+            }
+
+            handleMouseDown(e) {
+                // Don't handle mouse events while editing text
+                if (this.isEditing) return;
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Check resize handles first
+                if (this.selectedElement) {
+                    const handle = this.isOverResizeHandle(x, y, this.selectedElement);
+                    if (handle) {
+                        this.isResizing = true;
+                        this.selectedHandle = handle;
+                        this.dragStartX = x;
+                        this.dragStartY = y;
+                        return;
+                    }
+                }
+
+                // Check for element selection
+                this.selectedElement = null;
+                for (let i = this.elements.length - 1; i >= 0; i--) {
+                    const element = this.elements[i];
+                    if (this.isPointInElement(x, y, element)) {
+                        this.isDragging = true;
+                        this.selectedElement = element;
+                        this.dragStartX = x - element.x;
+                        this.dragStartY = y - element.y;
+                        break;
+                    }
+                }
+                this.render();
+            }
+
+            handleMouseMove(e) {
+                // Don't handle mouse events while editing text
+                if (this.isEditing) return;
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (this.isResizing && this.selectedElement && this.selectedHandle) {
+                    const dx = x - this.dragStartX;
+                    const dy = y - this.dragStartY;
+
+                    if (this.selectedElement.type === 'text') {
+                        // Calculate new scale based on the diagonal distance
+                        const originalDiagonal = Math.sqrt(
+                            Math.pow(this.selectedElement.width, 2) +
+                            Math.pow(this.selectedElement.height, 2)
+                        );
+
+                        const newDiagonal = Math.sqrt(
+                            Math.pow(this.selectedElement.width + dx, 2) +
+                            Math.pow(this.selectedElement.height + dy, 2)
+                        );
+
+                        const scale = newDiagonal / originalDiagonal;
+                        this.selectedElement.scale = scale;
+                        this.selectedElement.fontSize = Math.round(parseInt(this.selectedElement.fontSize) * scale);
+
+                        // Update width and height
+                        this.ctx.font = `${this.selectedElement.fontSize}px Arial`;
+                        this.selectedElement.width = this.ctx.measureText(this.selectedElement.text).width;
+                        this.selectedElement.height = this.selectedElement.fontSize;
+                    }
+
+                    this.dragStartX = x;
+                    this.dragStartY = y;
+                    this.render();
+                } else if (this.isDragging && this.selectedElement) {
+                    this.selectedElement.x = x - this.dragStartX;
+                    this.selectedElement.y = y - this.dragStartY;
+                    this.render();
+                }
+
+                // Update cursor
+                if (this.selectedElement) {
+                    const handle = this.isOverResizeHandle(x, y, this.selectedElement);
+                    if (handle) {
+                        this.canvas.style.cursor = handle.cursor;
+                    } else if (this.isPointInElement(x, y, this.selectedElement)) {
+                        this.canvas.style.cursor = 'move';
+                    } else {
+                        this.canvas.style.cursor = 'default';
+                    }
+                } else {
+                    this.canvas.style.cursor = 'default';
+                }
+            }
+
+            handleMouseUp() {
+                // Don't handle mouse events while editing text
+                if (this.isEditing) return;
+                this.isDragging = false;
+                this.isResizing = false;
+                this.selectedHandle = null;
+            }
+
+            isPointInElement(x, y, element) {
+                return x >= element.x &&
+                    x <= element.x + element.width &&
+                    y >= element.y - element.height &&
+                    y <= element.y;
+            }
+
+            render() {
+                if (this.isEditing) return;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.elements.forEach(element => {
+                    if (element.type === 'text') {
+                        this.ctx.font = `${element.fontSize}px Arial`;
+                        this.ctx.fillStyle = element.color;
+                        this.ctx.fillText(element.text, element.x, element.y);
+                    } else if (element.type === 'image') {
+                        this.ctx.drawImage(
+                            element.image,
+                            element.x,
+                            element.y,
+                            element.width,
+                            element.height
+                        );
+                    }
+                });
+
+                // Draw selection and resize handles
+                if (this.selectedElement) {
+                    this.ctx.strokeStyle = '#000';
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.strokeRect(
+                        this.selectedElement.x,
+                        this.selectedElement.y - this.selectedElement.height,
+                        this.selectedElement.width,
+                        this.selectedElement.height
+                    );
+                    this.ctx.setLineDash([]);
+                    this.drawResizeHandles(this.selectedElement);
+                }
+            }
+
+            clear() {
+                this.elements = [];
+                this.selectedElement = null;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            download() {
+                const link = document.createElement('a');
+                link.download = 'canvas-drawing.png';
+                link.href = this.canvas.toDataURL();
+                link.click();
+            }
+        }
+
+        // Initialize the canvas when the page loads
+        window.addEventListener('load', () => {
+            new DrawingCanvas();
+        });
+    </script>
 </body>
-<script src="https://unpkg.com/konva@7.0.3/konva.js"></script>
-<script src="index.js"></script>
+
 </html>
